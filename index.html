@@ -31,7 +31,7 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>تفعيل إشعارات الاعتماد/الرفضضضض22</h1>
+      <h1>تفعيل إشعارات الاعتماد/الرفض333</h1>
       <p>اضغط الزر التالي للسماح للإشعارات وتوصيل جهازك بمحفظتك.</p>
       <div class="row" style="margin:10px 0 12px">
         <button id="btn" class="btn">🔔 تفعيل الإشعارات</button>
@@ -39,24 +39,24 @@
       </div>
       <div id="details" class="hint"></div>
       <div style="margin-top:12px">
-        <div class="hint">ملاحظة: تعمل فقط على <b>HTTPS</b> أو <b>localhost</b>. هذه الصفحة الآن آمنة لأننا رفعناها على Netlify.</div>
+        <div class="hint">ملاحظة: تعمل فقط على <b>HTTPS</b> أو <b>localhost</b>.</div>
       </div>
     </div>
   </div>
 
   <script>
-  // ======== عدّل هذه القيم =========
+  // ======== عدّل هذه القيم إن لزم =========
   const firebaseConfig = {
-  apiKey: "AIzaSyCHVcGostwCnIvJXsjX60xWWVqF_RAbzn4",
-  authDomain: "medo-cf169.firebaseapp.com",
-  projectId: "medo-cf169",
-  storageBucket: "medo-cf169.firebasestorage.app",
-  messagingSenderId: "265864107835",
-  appId: "1:265864107835:web:0f78740bdc24f4661c091e",-
-  measurementId: "G-10R049D0BD"
-};
+    apiKey: "AIzaSyCHVcGostwCnIvJXsjX60xWWVqF_RAbzn4",
+    authDomain: "medo-cf169.firebaseapp.com",
+    projectId: "medo-cf169",
+    storageBucket: "medo-cf169.firebasestorage.app",
+    messagingSenderId: "265864107835",
+    appId: "1:265864107835:web:0f78740bdc24f4661c091e",
+    measurementId: "G-10R049D0BD"
+  };
   const VAPID_PUBLIC_KEY = "BGgnHxk-2_nvCM8jjGRrg2VxWLq1cQkjnbSGjUE4i2-fxY_SBWqz2tjdQGkJnrq8HEHwzdM0UQRQHgZptgTKypc"; // من Cloud Messaging
-  const API_BASE = "http://172.17.177.46:3000/owner-api/v1";   // لازم https
+  const API_BASE = "http://172.17.177.46:3000/owner-api/v1";   // كما طلبت (قد يُحظر على صفحات HTTPS)
   // =================================
 
   const $ = (id)=>document.getElementById(id);
@@ -80,8 +80,14 @@
     btn.disabled = true;
   }
 
-  // Firebase init
-  firebase.initializeApp(FIREBASE_CONFIG);
+  // Firebase init (تم تصحيح اسم المتغير)
+  try{
+    firebase.initializeApp(firebaseConfig);
+  }catch(e){
+    console.error(e);
+    logStatus("تعذّر تهيئة Firebase.", "err");
+    btn.disabled = true;
+  }
   const messaging = firebase.messaging();
 
   // تأكد من دعم الإشعارات و SW
@@ -93,9 +99,14 @@
     btn.disabled = true;
   }
 
+  // تحذير بسيط لو الصفحة HTTPS و API_BASE على HTTP (قد يمنع المتصفح الطلبات المختلطة)
+  if (location.protocol === "https:" && API_BASE.startsWith("http://")){
+    logStatus("تنبيه: الصفحة HTTPS لكن الخادم HTTP — قد يمنع المتصفح الطلبات (Mixed Content).", "err");
+  }
+
   // تسجيل SW على نفس الأصل (الجذر)
   async function ensureSW(){
-    // يجب أن يكون sw في نفس الجذر لهذا الأصل (Netlify: ضع الملف في أعلى المجلد)
+    // يجب أن يكون sw في نفس الجذر لهذا الأصل (ضع firebase-messaging-sw.js في الجذر)
     const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
     await navigator.serviceWorker.ready;
     return reg;
@@ -128,7 +139,6 @@
       user_id: uid,
       fcm_token: token,
       platform: "web",
-      // اختيارياً: بيانات المتصفح
       user_agent: navigator.userAgent || ""
     };
     const res = await fetch(url.toString(), {
@@ -158,7 +168,7 @@
       }
     }catch(e){
       console.error(e);
-      logStatus("خطأ: " + e.message, "err");
+      logStatus("خطأ: " + (e && e.message ? e.message : String(e)), "err");
       logDetails({ error: String(e) });
       btn.disabled = false;
     }
@@ -166,4 +176,3 @@
   </script>
 </body>
 </html>
-
