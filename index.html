@@ -24,15 +24,15 @@
     code{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 6px}
   </style>
 
-  <!-- Firebase compat SDKs (آمنة على HTTPS فقط) -->
+  <!-- Firebase compat SDKs (HTTPS فقط) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>تفعيل إشعارات الاعتماد/الرفض333</h1>
-      <p>اضغط الزر التالي للسماح للإشعارات وتوصيل جهازك بمحفظتك.</p>
+      <h1>تفعيل إشعارات الاعتماد/الرفض44</h1>
+      <p>اضغط الزر التالي للسماح بالإشعارات وتوصيل جهازك بمحفظتك.</p>
       <div class="row" style="margin:10px 0 12px">
         <button id="btn" class="btn">🔔 تفعيل الإشعارات</button>
         <span id="status" class="hint">جاهز</span>
@@ -45,7 +45,7 @@
   </div>
 
   <script>
-  // ======== عدّل هذه القيم إن لزم =========
+  // ======== القيم الأساسية =========
   const firebaseConfig = {
     apiKey: "AIzaSyCHVcGostwCnIvJXsjX60xWWVqF_RAbzn4",
     authDomain: "medo-cf169.firebaseapp.com",
@@ -55,15 +55,15 @@
     appId: "1:265864107835:web:0f78740bdc24f4661c091e",
     measurementId: "G-10R049D0BD"
   };
-  const VAPID_PUBLIC_KEY = "BGgnHxk-2_nvCM8jjGRrg2VxWLq1cQkjnbSGjUE4i2-fxY_SBWqz2tjdQGkJnrq8HEHwzdM0UQRQHgZptgTKypc"; // من Cloud Messaging
-  const API_BASE = "http://172.17.177.46:3000/owner-api/v1";   // كما طلبت (قد يُحظر على صفحات HTTPS)
+  const VAPID_PUBLIC_KEY = "BGgnHxk-2_nvCM8jjGRrg2VxWLq1cQkjnbSGjUE4i2-fxY_SBWqz2tjdQGkJnrq8HEHwzdM0UQRQHgZptgTKypc";
+  const API_BASE = "http://172.17.177.46:3000/owner-api/v1"; // كما طلبت
   // =================================
 
   const $ = (id)=>document.getElementById(id);
   const btn = $("btn"), statusEl = $("status"), detailsEl = $("details");
 
   // قراءة بارامترات الرابط: ?app_id=...&uid=...&redir=...
-  const urlp = new URLSearchParams(location.search);
+  const urlp  = new URLSearchParams(location.search);
   const appId = urlp.get("app_id") || urlp.get("appId") || "";
   const uid   = urlp.get("uid")    || urlp.get("user_id") || "";
   const redir = urlp.get("redir")  || "";
@@ -80,7 +80,7 @@
     btn.disabled = true;
   }
 
-  // Firebase init (تم تصحيح اسم المتغير)
+  // Firebase init
   try{
     firebase.initializeApp(firebaseConfig);
   }catch(e){
@@ -90,48 +90,49 @@
   }
   const messaging = firebase.messaging();
 
-  // تأكد من دعم الإشعارات و SW
+  // دعم المتصفح
   const canNotify = "Notification" in window;
-  const canSW = "serviceWorker" in navigator;
-
+  const canSW     = "serviceWorker" in navigator;
   if (!canNotify || !canSW){
     logStatus("متصفحك لا يدعم Notifications أو Service Worker.", "err");
     btn.disabled = true;
   }
 
-  // تحذير بسيط لو الصفحة HTTPS و API_BASE على HTTP (قد يمنع المتصفح الطلبات المختلطة)
+  // تحذير بسيط لو HTTPS + API_BASE = HTTP (لن يؤثر على تسجيل SW)
   if (location.protocol === "https:" && API_BASE.startsWith("http://")){
-    logStatus("تنبيه: الصفحة HTTPS لكن الخادم HTTP — قد يمنع المتصفح الطلبات (Mixed Content).", "err");
+    console.warn("Mixed Content محتمل لطلبات الخادم.");
   }
 
-  // تسجيل SW على نفس الأصل (الجذر)
+  // ===== تسجيل الـService Worker من نفس مجلد الصفحة (/LS-wallet/) =====
   async function ensureSW(){
-    // يجب أن يكون sw في نفس الجذر لهذا الأصل (ضع firebase-messaging-sw.js في الجذر)
-    const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    // نبني basePath من مسار الصفحة الحالية ليكون النطاق على /LS-wallet/
+    const basePath = location.pathname.endsWith('/')
+      ? location.pathname
+      : location.pathname.replace(/[^/]+$/, '/'); // .../LS-wallet/index.html -> .../LS-wallet/
+
+    const swUrl = basePath + "firebase-messaging-sw.js?v=" + Date.now(); // منع كاش أثناء التجربة
+    const reg = await navigator.serviceWorker.register(swUrl, { scope: basePath });
     await navigator.serviceWorker.ready;
+    console.log("SW registered at:", swUrl, "scope:", reg.scope);
     return reg;
   }
 
-  // جلب أو طلب السماح ثم getToken
+  // ===== طلب الإذن ثم getToken من FCM =====
   async function getFcmToken(){
-    // طلب الإذن
     const perm = await Notification.requestPermission();
     if (perm !== "granted") throw new Error("تم رفض إذن الإشعارات من المستخدم");
 
-    // تسجيل SW
     const reg = await ensureSW();
 
-    // جلب FCM token
     const token = await messaging.getToken({
       vapidKey: VAPID_PUBLIC_KEY,
       serviceWorkerRegistration: reg
     });
     if (!token) throw new Error("تعذر جلب FCM token");
-
     return token;
   }
 
-  // إرسال التوكن لسيرفرك لربط التوبيك user_${appId}_${uid}
+  // ===== إرسال التوكن لسيرفرك =====
   async function registerOnBackend(token){
     const url = new URL(API_BASE + "/register-fcm");
     url.searchParams.set("app_id", appId);
@@ -147,12 +148,11 @@
       body: JSON.stringify(body)
     });
     let j=null; try{ j=await res.json(); }catch{}
-    if (!res.ok){
-      throw new Error((j && j.message) || "فشل تسجيل التوكن لدى الخادم");
-    }
+    if (!res.ok) throw new Error((j && j.message) || "فشل تسجيل التوكن لدى الخادم");
     return j;
   }
 
+  // ===== حدث الزر =====
   btn.onclick = async ()=>{
     btn.disabled = true; logStatus("... جاري التفعيل");
     try{
@@ -161,11 +161,7 @@
       const resp = await registerOnBackend(token);
       logStatus("✅ تم التسجيل بنجاح. ستصلك إشعارات الاعتماد/الرفض.", "ok");
       logDetails({ token, backend: resp });
-
-      // رجوع (اختياري)
-      if (redir){
-        setTimeout(()=>{ location.href = redir; }, 1200);
-      }
+      if (redir){ setTimeout(()=>{ location.href = redir; }, 1200); }
     }catch(e){
       console.error(e);
       logStatus("خطأ: " + (e && e.message ? e.message : String(e)), "err");
